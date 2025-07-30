@@ -1,4 +1,17 @@
 body {
-  overflow: hidden;
-  margin: 0px;
+    overflow: hidden;
+    margin: 0px;
+}
+#debug {
+    font-family: monospace;
+    font-size: larger;
+    position: absolute;
+    left: 0px;
+    top: 50px;
+    border: 1px solid red;
+    padding: 10px;
+    width: 180px;
+    height: 220px;
+    color: white;
+    pointer-events: none;
 }
