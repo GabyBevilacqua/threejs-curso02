@@ -1,22 +1,45 @@
 import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+//import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 import Stats from 'three/addons/libs/stats.module.js'
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
 
 const scene = new THREE.Scene()
 
-scene.add(new THREE.GridHelper())
+const environmentTexture = new THREE.CubeTextureLoader().setPath('https://sbcode.net/img/').load(['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png'])
+scene.environment = environmentTexture
+scene.background = environmentTexture
+
+//const hdr = 'https://sbcode.net/img/rustig_koppie_puresky_1k.hdr'
+// //const hdr = 'https://sbcode.net/img/venice_sunset_1k.hdr'
+// //const hdr = 'https://sbcode.net/img/spruit_sunrise_1k.hdr'
+
+// let environmentTexture: THREE.DataTexture
+
+// new RGBELoader().load(hdr, (texture) => {
+//   environmentTexture = texture
+//   environmentTexture.mapping = THREE.EquirectangularReflectionMapping
+//   scene.environment = environmentTexture
+//   scene.background = environmentTexture
+//   scene.environmentIntensity = 1 // added in Three r163
+// })
+
+const directionallight = new THREE.DirectionalLight(0xebfeff, Math.PI)
+directionallight.position.set(1, 0.1, 1)
+directionallight.visible = false
+scene.add(directionallight)
+
+const ambientLight = new THREE.AmbientLight(0xebfeff, Math.PI / 16)
+ambientLight.visible = false
+scene.add(ambientLight)
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100)
-camera.position.set(-1, 4, 2.5)
+camera.position.set(-2, 0.5, 2)
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
-renderer.shadowMap.type = THREE.PCFShadowMap // (default)
-//renderer.shadowMap.type = THREE.PCFSoftShadowMap
-//renderer.shadowMap.type = THREE.BasicShadowMap
-//renderer.shadowMap.type = THREE.VSMShadowMap
-renderer.shadowMap.enabled = true
+renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.setSize(window.innerWidth, window.innerHeight)
 document.body.appendChild(renderer.domElement)
 
@@ -29,255 +52,99 @@ window.addEventListener('resize', () => {
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = true
 
-const plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0xffffff }))
+const texture = new THREE.TextureLoader().load('https://sbcode.net/img/grid.png')
+texture.colorSpace = THREE.SRGBColorSpace
+
+const material = new THREE.MeshPhysicalMaterial()
+material.side = THREE.DoubleSide
+// material.envMapIntensity = 0.7
+// material.roughness = 0.17
+// material.metalness = 0.07
+// material.clearcoat = 0.43
+// material.iridescence = 1
+// material.transmission = 1
+// material.thickness = 5.12
+// material.ior = 1.78
+
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), material)
 plane.rotation.x = -Math.PI / 2
-plane.receiveShadow = true
-plane.castShadow = true
+plane.position.y = -1
+plane.visible = false
 scene.add(plane)
 
-const data = {
-  color: 0x00ff00,
-  lightColor: 0xffffff,
-  shadowMapSizeWidth: 512,
-  shadowMapSizeHeight: 512,
-}
+new GLTFLoader().load('https://sbcode.net/models/suzanne_no_material.glb', (gltf) => {
+  gltf.scene.traverse((child) => {
+    ;(child as THREE.Mesh).material = material
+  })
+  scene.add(gltf.scene)
+})
 
-const geometry = new THREE.IcosahedronGeometry(1, 1)
-
-const meshes = [
-  new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: data.color })),
-  new THREE.Mesh(geometry, new THREE.MeshNormalMaterial({ flatShading: true })),
-  new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({ color: data.color, flatShading: true })),
-  new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: data.color, flatShading: true })),
-]
-
-meshes[0].position.set(-3, 1, 0)
-meshes[1].position.set(-1, 1, 0)
-meshes[2].position.set(1, 1, 0)
-meshes[3].position.set(3, 1, 0)
-
-meshes[0].castShadow = true
-meshes[1].castShadow = true
-meshes[2].castShadow = true
-meshes[3].castShadow = true
-//meshes.map((m) => (m.castShadow = true)) // using array map
-meshes.map((m) => (m.receiveShadow = true))
-
-// and instead of using `meshes.map` on two lines in a row, you can use once and share it like,
-// meshes.map((m) => {
-//   m.castShadow = true
-//   m.receiveShadow = true
-// })
-
-scene.add(...meshes)
+const data = { environment: true, background: true, mapEnabled: false, planeVisible: false }
 
 const gui = new GUI()
 
-// #region DirectionalLight
+gui.add(data, 'environment').onChange(() => {
+  if (data.environment) {
+    scene.environment = environmentTexture
+    directionallight.visible = false
+    ambientLight.visible = false
+  } else {
+    scene.environment = null
+    directionallight.visible = true
+    ambientLight.visible = true
+  }
+})
 
-const directionalLight = new THREE.DirectionalLight(data.lightColor, Math.PI)
-directionalLight.position.set(1, 1, 1)
-directionalLight.castShadow = true
-directionalLight.shadow.camera.near = 0
-directionalLight.shadow.camera.far = 10
-directionalLight.shadow.mapSize.width = data.shadowMapSizeWidth
-directionalLight.shadow.mapSize.height = data.shadowMapSizeHeight
-scene.add(directionalLight)
+gui.add(scene, 'environmentIntensity', 0, 2, 0.01) // new in Three r163. Can be used instead of `renderer.toneMapping` with `renderer.toneMappingExposure`
 
-// const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight)
-const directionalLightHelper = new THREE.CameraHelper(directionalLight.shadow.camera)
-directionalLightHelper.visible = false
-scene.add(directionalLightHelper)
+gui.add(renderer, 'toneMappingExposure', 0, 2, 0.01)
 
-const directionalLightFolder = gui.addFolder('DirectionalLight')
-directionalLightFolder.add(directionalLight, 'visible')
-directionalLightFolder.addColor(data, 'lightColor').onChange(() => {
-  directionalLight.color.set(data.lightColor)
+gui.add(data, 'background').onChange(() => {
+  if (data.background) {
+    scene.background = environmentTexture
+  } else {
+    scene.background = null
+  }
 })
-directionalLightFolder.add(directionalLight, 'intensity', 0, Math.PI * 10)
-directionalLightFolder.add(directionalLight.position, 'x', -5, 5, 0.001).onChange(() => {
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLight.position, 'y', -5, 5, 0.001).onChange(() => {
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLight.position, 'z', -5, 5, 0.001).onChange(() => {
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLightHelper, 'visible').name('Helper Visible')
-directionalLightFolder.add(directionalLight.shadow.camera, 'left', -10, -1, 0.1).onChange(() => {
-  directionalLight.shadow.camera.updateProjectionMatrix()
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLight.shadow.camera, 'right', 1, 10, 0.1).onChange(() => {
-  directionalLight.shadow.camera.updateProjectionMatrix()
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLight.shadow.camera, 'top', 1, 10, 0.1).onChange(() => {
-  directionalLight.shadow.camera.updateProjectionMatrix()
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLight.shadow.camera, 'bottom', -10, -1, 0.1).onChange(() => {
-  directionalLight.shadow.camera.updateProjectionMatrix()
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLight.shadow.camera, 'near', 0, 100).onChange(() => {
-  directionalLight.shadow.camera.updateProjectionMatrix()
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(directionalLight.shadow.camera, 'far', 0.1, 100).onChange(() => {
-  directionalLight.shadow.camera.updateProjectionMatrix()
-  directionalLightHelper.update()
-})
-directionalLightFolder.add(data, 'shadowMapSizeWidth', [256, 512, 1024, 2048, 4096]).onChange(() => updateDirectionalLightShadowMapSize())
-directionalLightFolder.add(data, 'shadowMapSizeHeight', [256, 512, 1024, 2048, 4096]).onChange(() => updateDirectionalLightShadowMapSize())
-directionalLightFolder.add(directionalLight.shadow, 'radius', 1, 10, 1).name('radius (PCF | VSM)') // PCFShadowMap or VSMShadowMap
-directionalLightFolder.add(directionalLight.shadow, 'blurSamples', 1, 20, 1).name('blurSamples (VSM)') // VSMShadowMap only
-directionalLightFolder.open()
 
-function updateDirectionalLightShadowMapSize() {
-  directionalLight.shadow.mapSize.width = data.shadowMapSizeWidth
-  directionalLight.shadow.mapSize.height = data.shadowMapSizeHeight
-  directionalLight.shadow.map = null
-}
-// #endregion
+gui.add(scene, 'backgroundBlurriness', 0, 1, 0.01)
 
-// #region Pointlight
+gui.add(data, 'mapEnabled').onChange(() => {
+  if (data.mapEnabled) {
+    material.map = texture
+  } else {
+    material.map = null
+  }
+  material.needsUpdate = true
+})
 
-const pointLight = new THREE.PointLight(data.lightColor, Math.PI)
-pointLight.position.set(2, 1, 0)
-pointLight.visible = false
-pointLight.castShadow = true
-scene.add(pointLight)
+gui.add(data, 'planeVisible').onChange((v) => {
+  plane.visible = v
+})
 
-const pointLightHelper = new THREE.PointLightHelper(pointLight)
-pointLightHelper.visible = false
-scene.add(pointLightHelper)
-
-const pointLightFolder = gui.addFolder('Pointlight')
-pointLightFolder.add(pointLight, 'visible')
-pointLightFolder.addColor(data, 'lightColor').onChange(() => {
-  pointLight.color.set(data.lightColor)
-})
-pointLightFolder.add(pointLight, 'intensity', 0, Math.PI * 10)
-pointLightFolder.add(pointLight.position, 'x', -10, 10)
-pointLightFolder.add(pointLight.position, 'y', -10, 10)
-pointLightFolder.add(pointLight.position, 'z', -10, 10)
-pointLightFolder.add(pointLight, 'distance', 0.01, 20)
-pointLightFolder.add(pointLight, 'decay', 0, 10)
-pointLightFolder.add(pointLightHelper, 'visible').name('Helper Visible')
-pointLightFolder.add(pointLight.shadow.camera, 'near', 0.01, 100).onChange(() => {
-  pointLight.shadow.camera.updateProjectionMatrix()
-  pointLightHelper.update()
-})
-pointLightFolder.add(pointLight.shadow.camera, 'far', 0.1, 100).onChange(() => {
-  pointLight.shadow.camera.updateProjectionMatrix()
-  pointLightHelper.update()
-})
-pointLightFolder.add(data, 'shadowMapSizeWidth', [256, 512, 1024, 2048, 4096]).onChange(() => updatePointLightShadowMapSize())
-pointLightFolder.add(data, 'shadowMapSizeHeight', [256, 512, 1024, 2048, 4096]).onChange(() => updatePointLightShadowMapSize())
-pointLightFolder.add(pointLight.shadow, 'radius', 1, 10, 1).name('radius (PCF | VSM)') // PCFShadowMap or VSMShadowMap
-pointLightFolder.add(pointLight.shadow, 'blurSamples', 1, 20, 1).name('blurSamples (VSM)') // VSMShadowMap only
-pointLightFolder.close()
-
-function updatePointLightShadowMapSize() {
-  pointLight.shadow.mapSize.width = data.shadowMapSizeWidth
-  pointLight.shadow.mapSize.height = data.shadowMapSizeHeight
-  pointLight.shadow.map = null
-}
-
-// #endregion
-
-// #region Spotlight
-
-const spotLight = new THREE.SpotLight(data.lightColor, Math.PI)
-spotLight.position.set(3, 2.5, 1)
-spotLight.visible = false
-//spotLight.target.position.set(5, 0, -5)
-spotLight.castShadow = true
-scene.add(spotLight)
-
-//const spotLightHelper = new THREE.SpotLightHelper(spotLight)
-const spotLightHelper = new THREE.CameraHelper(spotLight.shadow.camera)
-spotLightHelper.visible = false
-scene.add(spotLightHelper)
-
-const spotLightFolder = gui.addFolder('Spotlight')
-spotLightFolder.add(spotLight, 'visible')
-spotLightFolder.addColor(data, 'lightColor').onChange(() => {
-  spotLight.color.set(data.lightColor)
-})
-spotLightFolder.add(spotLight, 'intensity', 0, Math.PI * 10)
-spotLightFolder.add(spotLight.position, 'x', -10, 10).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(spotLight.position, 'y', -10, 10).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(spotLight.position, 'z', -10, 10).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(spotLight, 'distance', 0.01, 100).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(spotLight, 'decay', 0, 10).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(spotLight, 'angle', 0, 1).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(spotLight, 'penumbra', 0, 1, 0.001).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(spotLightHelper, 'visible').name('Helper Visible')
-spotLightFolder.add(spotLight.shadow.camera, 'near', 0.01, 100).onChange(() => {
-  spotLight.shadow.camera.updateProjectionMatrix()
-  spotLightHelper.update()
-})
-spotLightFolder.add(data, 'shadowMapSizeWidth', [256, 512, 1024, 2048, 4096]).onChange(() => updateSpotLightShadowMapSize())
-spotLightFolder.add(data, 'shadowMapSizeHeight', [256, 512, 1024, 2048, 4096]).onChange(() => updateSpotLightShadowMapSize())
-spotLightFolder.add(spotLight.shadow, 'radius', 1, 10, 1).name('radius (PCF | VSM)') // PCFShadowMap or VSMShadowMap
-spotLightFolder.add(spotLight.shadow, 'blurSamples', 1, 20, 1).name('blurSamples (VSM)') // VSMShadowMap only
-spotLightFolder.close()
-
-function updateSpotLightShadowMapSize() {
-  spotLight.shadow.mapSize.width = data.shadowMapSizeWidth
-  spotLight.shadow.mapSize.height = data.shadowMapSizeHeight
-  spotLight.shadow.map = null
-}
-
-// #endregion
+const materialFolder = gui.addFolder('meshPhysicalMaterial')
+materialFolder.add(material, 'envMapIntensity', 0, 1.0, 0.01).onChange(() => {
+  // Since r163, `envMap` is no longer copied from `scene.environment`. You will need to manually copy it, if you want to modify `envMapIntensity`
+  if (!material.envMap) {
+    material.envMap = scene.environment
+  }
+}) // from meshStandardMaterial
+materialFolder.add(material, 'roughness', 0, 1.0, 0.01) // from meshStandardMaterial
+materialFolder.add(material, 'metalness', 0, 1.0, 0.01) // from meshStandardMaterial
+materialFolder.add(material, 'clearcoat', 0, 1.0, 0.01)
+materialFolder.add(material, 'iridescence', 0, 1.0, 0.01)
+materialFolder.add(material, 'transmission', 0, 1.0, 0.01)
+materialFolder.add(material, 'thickness', 0, 10.0, 0.01)
+materialFolder.add(material, 'ior', 1.0, 2.333, 0.01)
+materialFolder.close()
 
 const stats = new Stats()
 document.body.appendChild(stats.dom)
-
-const labels = document.querySelectorAll<HTMLDivElement>('.label')
-
-let x, y
-const v = new THREE.Vector3()
 
 function animate() {
   requestAnimationFrame(animate)
 
   controls.update()
-
-  for (let i = 0; i < 4; i++) {
-    v.copy(meshes[i].position)
-    v.project(camera)
-
-    x = ((1 + v.x) / 2) * innerWidth - 50
-    y = ((1 - v.y) / 2) * innerHeight
-
-    labels[i].style.left = x + 'px'
-    labels[i].style.top = y + 'px'
-  }
 
   renderer.render(scene, camera)
 

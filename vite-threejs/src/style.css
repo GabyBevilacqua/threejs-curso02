@@ -2,15 +2,3 @@ body {
   overflow: hidden;
   margin: 0px;
 }
-
-.label {
-  position: absolute;
-  color: #ffffff;
-  font-family: monospace;
-  pointer-events: none;
-  text-align: center;
-  width: 75px;
-  height: 25px;
-  font-size: 1vw;
-  filter: drop-shadow(2px 2px 1px #000000);
-}
