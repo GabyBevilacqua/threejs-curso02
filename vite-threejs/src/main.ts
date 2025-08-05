@@ -2,29 +2,29 @@ import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-//import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
 import Stats from 'three/addons/libs/stats.module.js'
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
 
 const scene = new THREE.Scene()
 
-const environmentTexture = new THREE.CubeTextureLoader().setPath('https://sbcode.net/img/').load(['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png'])
-scene.environment = environmentTexture
-scene.background = environmentTexture
+// const environmentTexture = new THREE.CubeTextureLoader().setPath('https://sbcode.net/img/').load(['px.png', 'nx.png', 'py.png', 'ny.png', 'pz.png', 'nz.png'])
+// scene.environment = environmentTexture
+// scene.background = environmentTexture
 
 //const hdr = 'https://sbcode.net/img/rustig_koppie_puresky_1k.hdr'
-// //const hdr = 'https://sbcode.net/img/venice_sunset_1k.hdr'
-// //const hdr = 'https://sbcode.net/img/spruit_sunrise_1k.hdr'
+//const hdr = 'https://sbcode.net/img/venice_sunset_1k.hdr'
+const hdr = 'https://sbcode.net/img/spruit_sunrise_1k.hdr'
 
-// let environmentTexture: THREE.DataTexture
+let environmentTexture: THREE.DataTexture
 
-// new RGBELoader().load(hdr, (texture) => {
-//   environmentTexture = texture
-//   environmentTexture.mapping = THREE.EquirectangularReflectionMapping
-//   scene.environment = environmentTexture
-//   scene.background = environmentTexture
-//   scene.environmentIntensity = 1 // added in Three r163
-// })
+new RGBELoader().load(hdr, (texture) => {
+  environmentTexture = texture
+  environmentTexture.mapping = THREE.EquirectangularReflectionMapping
+  scene.environment = environmentTexture
+  scene.background = environmentTexture
+ // scene.environmentIntensity = 1 // added in Three r163
+})
 
 const directionallight = new THREE.DirectionalLight(0xebfeff, Math.PI)
 directionallight.position.set(1, 0.1, 1)
@@ -57,14 +57,14 @@ texture.colorSpace = THREE.SRGBColorSpace
 
 const material = new THREE.MeshPhysicalMaterial()
 material.side = THREE.DoubleSide
-// material.envMapIntensity = 0.7
-// material.roughness = 0.17
-// material.metalness = 0.07
-// material.clearcoat = 0.43
-// material.iridescence = 1
-// material.transmission = 1
-// material.thickness = 5.12
-// material.ior = 1.78
+material.envMapIntensity = 0.7
+material.roughness = 0.17
+material.metalness = 0.07
+material.clearcoat = 0.43
+material.iridescence = 1
+material.transmission = 1
+material.thickness = 5.12
+material.ior = 1.78
 
 const plane = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), material)
 plane.rotation.x = -Math.PI / 2
