@@ -10,17 +10,17 @@ import Stats from 'three/addons/libs/stats.module.js'
 
 const scene = new THREE.Scene()
 
-const hdr = 'https://sbcode.net/img/venice_sunset_1k.hdr'
-const image = 'https://sbcode.net/img/grid.png'
-const model = 'https://sbcode.net/models/suzanne_no_material.glb'
+// const hdr = 'https://sbcode.net/img/venice_sunset_1k.hdr'
+// const image = 'https://sbcode.net/img/grid.png'
+// const model = 'https://sbcode.net/models/suzanne_no_material.glb'
 
 // const hdr = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/equirectangular/venice_sunset_1k.hdr'
 // const image = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/textures/uv_grid_opengl.jpg'
 // const model = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/models/gltf/Xbot.glb'
 
-// const hdr = 'img/venice_sunset_1k.hdr'
-// const image = 'img/grid.png'
-// const model = 'models/suzanne_no_material.glb'
+const hdr = 'img/venice_sunset_1k.hdr'
+const image = 'img/grid.png'
+const model = 'models/Horse.glb'
 
 new RGBELoader().load(hdr, (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping
@@ -58,6 +58,8 @@ new GLTFLoader().load(model, (gltf) => {
   gltf.scene.traverse((child) => {
     ;(child as THREE.Mesh).material = material
   })
+  
+  gltf.scene.scale.set(0.01, 0.01, 0.01) // Escalar el modelo para hacerlo más pequeño esto lo agregue yo, no esta en el curso
   scene.add(gltf.scene)
 })
 
