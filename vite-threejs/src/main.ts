@@ -1,96 +1,267 @@
-import './style.css'
-import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import Stats from 'three/addons/libs/stats.module.js'
+import "./style.css";
+import {
+  Mesh,
+  Color,
+  MeshStandardMaterial,
+  BufferGeometry,
+  Raycaster,
+  Scene,
+  SpotLight,
+  PerspectiveCamera,
+  WebGLRenderer,
+  VSMShadowMap,
+  BoxGeometry,
+  CylinderGeometry,
+  TetrahedronGeometry,
+  PlaneGeometry,
+  Vector2,
+  Clock,
+  EquirectangularReflectionMapping,
+  MeshPhongMaterial,
+  Vector3,
+  MathUtils,
+} from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+import Stats from "three/addons/libs/stats.module.js";
 
-const scene = new THREE.Scene()
-
-const gridHelper = new THREE.GridHelper()
-gridHelper.position.y = -0.5
-scene.add(gridHelper)
-
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100)
-camera.position.z = 2
-
-const renderer = new THREE.WebGLRenderer()
-renderer.setSize(window.innerWidth, window.innerHeight)
-document.body.appendChild(renderer.domElement)
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-})
-
-// const info = document.createElement('div')
-// info.style.cssText = 'position:absolute;bottom:10px;left:10px;color:white;font-family:monospace;font-size: 17px;filter: drop-shadow(1px 1px 1px #000000);'
-// document.body.appendChild(info)
-
-const controls = new OrbitControls(camera, renderer.domElement)
-
-// camera.lookAt(0.5, 0.5, 0.5)
-// controls.target.set(.5, .5, .5)
-// controls.update()
-
-// controls.addEventListener('change', () => console.log("Controls Change"))
-// controls.addEventListener('start', () => console.log("Controls Start Event"))
-// controls.addEventListener('end', () => console.log("Controls End Event"))
-// controls.autoRotate = true
-//  controls.autoRotateSpeed = 10
-// controls.enableDamping = true
-//  controls.dampingFactor = .01
-// controls.listenToKeyEvents(window)
-// controls.keys = {
-//     LEFT: 'KeyA', // default 'ArrowLeft'
-//     UP: 'KeyW', // default 'ArrowUp'
-//     RIGHT: 'KeyD', // default 'ArrowRight'
-//     BOTTOM: 'KeyS' // default 'ArrowDown'
-// }
-// controls.mouseButtons = {
-//     LEFT: THREE.MOUSE.ROTATE,
-//     MIDDLE: THREE.MOUSE.DOLLY,
-//     RIGHT: THREE.MOUSE.PAN
-// }
-// controls.touches = {
-//     ONE: THREE.TOUCH.ROTATE,
-//     TWO: THREE.TOUCH.DOLLY_PAN
-// }
-// controls.screenSpacePanning = true
-// controls.minAzimuthAngle = 0
-// controls.maxAzimuthAngle = Math.PI / 2
-// controls.minPolarAngle = 0
-// controls.maxPolarAngle = Math.PI
-// controls.maxDistance = 4
-// controls.minDistance = 1.5
-// controls.enabled = false
-// controls.enablePan = false
-// controls.enableRotate = false
-// controls.enableZoom = false
-
-const geometry = new THREE.BoxGeometry()
-const material = new THREE.MeshNormalMaterial({ wireframe: true })
-
-const cube = new THREE.Mesh(geometry, material)
-scene.add(cube)
-
-const stats = new Stats()
-document.body.appendChild(stats.dom)
-
-function animate() {
-  requestAnimationFrame(animate)
-
-   controls.update()
-
-  // info.innerText =
-  //   'Polar Angle : ' +
-  //   ((controls.getPolarAngle() / -Math.PI) * 180 + 90).toFixed(2) +
-  //   '°\nAzimuth Angle : ' +
-  //   ((controls.getAzimuthalAngle() / Math.PI) * 180).toFixed(2) +
-  //   '°'
-
-  renderer.render(scene, camera)
-
-  stats.update()
+function lerp(from: number, to: number, speed: number) {
+  const amount = (1 - speed) * from + speed * to;
+  return Math.abs(from - to) < 0.001 ? to : amount;
 }
 
-animate()
+class Pickable extends Mesh {
+  hovered = false;
+  clicked = false;
+  colorTo: Color;
+  defaultColor: Color;
+  geometry: BufferGeometry;
+  material: MeshStandardMaterial;
+  v = new Vector3();
+
+  constructor(
+    geometry: BufferGeometry,
+    material: MeshStandardMaterial,
+    colorTo: Color
+  ) {
+    super();
+    this.geometry = geometry;
+    this.material = material;
+    this.colorTo = colorTo;
+    this.defaultColor = material.color.clone();
+    this.castShadow = true;
+  }
+
+  update(delta: number) {
+    this.rotation.x += delta / 2
+    this.rotation.y += delta / 2
+
+    // this.clicked
+    // ? (this.position.y = MathUtils.lerp(this.position.y, 1, delta * 5))
+    // : (this.position.y = MathUtils.lerp(this.position.y, 0, delta * 5))
+
+    //console.log(this.position.y)
+
+    this.clicked
+      ? (this.position.y = lerp(this.position.y, 1, delta * 5))
+      : (this.position.y = lerp(this.position.y, 0, delta * 5));
+
+    this.hovered
+      ? this.material.color.lerp(this.colorTo, delta * 10)
+      : this.material.color.lerp(this.defaultColor, delta * 10);
+
+    this.hovered
+      ? (this.material.color.lerp(this.colorTo, delta * 10),
+        (this.material.roughness = lerp(this.material.roughness, 0, delta * 10)),
+        (this.material.metalness = lerp(this.material.metalness, 1, delta * 10))
+        )
+      : (this.material.color.lerp(this.defaultColor, delta),
+        (this.material.roughness = lerp(this.material.roughness, 1, delta)),
+        (this.material.metalness = lerp(this.material.metalness, 0, delta)))
+
+// --------------tres maneras distintas para cambiar la escala----------------------------
+
+    // this.clicked
+    //   ? this.scale.set(
+    //       MathUtils.lerp(this.scale.x, 1.5, delta * 5),
+    //       MathUtils.lerp(this.scale.y, 1.5, delta * 5),
+    //       MathUtils.lerp(this.scale.z, 1.5, delta * 5)
+    //     )
+    //   : this.scale.set(
+    //       MathUtils.lerp(this.scale.x, 1.0, delta),
+    //       MathUtils.lerp(this.scale.y, 1.0, delta),
+    //       MathUtils.lerp(this.scale.z, 1.0, delta)
+    //     )
+
+    // this.clicked
+    //   ? this.scale.set(
+    //       lerp(this.scale.x, 1.5, delta * 5),
+    //       lerp(this.scale.y, 1.5, delta * 5),
+    //       lerp(this.scale.z, 1.5, delta * 5)
+    //     )
+    //   : this.scale.set(
+    //       lerp(this.scale.x, 1.0, delta),
+    //       lerp(this.scale.y, 1.0, delta),
+    //       lerp(this.scale.z, 1.0, delta)
+    //     )
+
+    this.clicked ? this.v.set(1.5, 1.5, 1.5) : this.v.set(1.0, 1.0, 1.0)
+    this.scale.lerp(this.v, delta * 5)
+  }
+}
+
+const scene = new Scene();
+
+const spotLight = new SpotLight(0xffffff, 500);
+spotLight.position.set(5, 5, 5);
+spotLight.angle = 0.3;
+spotLight.penumbra = 0.5;
+spotLight.castShadow = true;
+spotLight.shadow.radius = 20;
+spotLight.shadow.blurSamples = 20;
+spotLight.shadow.camera.far = 20;
+scene.add(spotLight);
+
+await new RGBELoader().loadAsync("img/venice_sunset_1k.hdr").then((texture) => {
+  texture.mapping = EquirectangularReflectionMapping;
+  scene.environment = texture;
+});
+
+const camera = new PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(0, 2, 4);
+
+const renderer = new WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = VSMShadowMap;
+document.body.appendChild(renderer.domElement);
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI / 2 + Math.PI / 16; // ~ 100 degrees
+
+const raycaster = new Raycaster();
+const pickables: Pickable[] = []; // used in the raycaster intersects methods
+let intersects;
+const mouse = new Vector2();
+
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  mouse.set(
+    (e.clientX / renderer.domElement.clientWidth) * 2 - 1,
+    -(e.clientY / renderer.domElement.clientHeight) * 2 + 1
+  );
+
+  raycaster.setFromCamera(mouse, camera);
+
+  intersects = raycaster.intersectObjects(pickables, false);
+
+  // toggles `clicked` property for only the Pickable closest to the camera
+  intersects.length &&
+    ((intersects[0].object as Pickable).clicked = !(
+      intersects[0].object as Pickable
+    ).clicked);
+
+  // la manera tradicional de escribir esto seria :
+
+  //   if (intersects.length > 0) {
+  //   const pickable = intersects[0].object as Pickable
+  //   pickable.clicked = !pickable.clicked
+  // }
+
+
+  //--------------codigo adicional para redireccion a la otra pagina-----------------------------------
+
+  if (intersects.length && intersects[0].object === cylinder) {
+    setTimeout(() => {
+      window.location.href = "pagina2.html";
+    }, 1000); // 1000 ms de retardo, ajusta según tu animación
+  }
+
+  // toggles `clicked` property for all overlapping Pickables detected by the raycaster at the same time
+  // intersects.forEach((i) => {
+  //   ;(i.object as Pickable).clicked = !(i.object as Pickable).clicked
+  // })
+});
+
+renderer.domElement.addEventListener("mousemove", (e) => {
+  mouse.set(
+    (e.clientX / renderer.domElement.clientWidth) * 2 - 1,
+    -(e.clientY / renderer.domElement.clientHeight) * 2 + 1
+  );
+
+  raycaster.setFromCamera(mouse, camera);
+
+  intersects = raycaster.intersectObjects(pickables, false);
+
+  pickables.forEach((p) => (p.hovered = false));
+
+  intersects.length && ((intersects[0].object as Pickable).hovered = true);
+});
+
+const cylinder = new Pickable(
+  new CylinderGeometry(0.66, 0.66),
+  new MeshStandardMaterial({ color: 0x888888 }),
+  new Color(0x008800)
+);
+scene.add(cylinder);
+pickables.push(cylinder);
+
+const cube = new Pickable(
+  new BoxGeometry(),
+  new MeshStandardMaterial({ color: 0x888888 }),
+  new Color(0xff2200)
+);
+cube.position.set(-2, 0, 0);
+scene.add(cube);
+pickables.push(cube);
+
+const pyramid = new Pickable(
+  new TetrahedronGeometry(),
+  new MeshStandardMaterial({ color: 0x888888 }),
+  new Color(0x0088ff)
+);
+pyramid.position.set(2, 0, 0);
+scene.add(pyramid);
+pickables.push(pyramid);
+
+const floor = new Mesh(new PlaneGeometry(20, 20), new MeshPhongMaterial());
+floor.rotateX(-Math.PI / 2);
+floor.position.y = -1.25;
+floor.receiveShadow = true;
+//floor.material.envMapIntensity = 0
+scene.add(floor);
+
+const stats = new Stats();
+document.body.appendChild(stats.dom);
+
+const clock = new Clock();
+let delta = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  delta = clock.getDelta();
+
+  pickables.forEach((p) => {
+    p.update(delta);
+  });
+
+  controls.update();
+
+  renderer.render(scene, camera);
+
+  stats.update();
+}
+
+animate();
