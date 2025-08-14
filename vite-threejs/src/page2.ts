@@ -53,8 +53,8 @@ class Pickable extends Mesh {
   }
 
   update(delta: number) {
-    this.rotation.x += delta / 2
-    this.rotation.y += delta / 2
+    this.rotation.x += delta / 2;
+    this.rotation.y += delta / 2;
 
     // this.clicked
     // ? (this.position.y = MathUtils.lerp(this.position.y, 1, delta * 5))
@@ -72,14 +72,21 @@ class Pickable extends Mesh {
 
     this.hovered
       ? (this.material.color.lerp(this.colorTo, delta * 10),
-        (this.material.roughness = lerp(this.material.roughness, 0, delta * 10)),
-        (this.material.metalness = lerp(this.material.metalness, 1, delta * 10))
-        )
+        (this.material.roughness = lerp(
+          this.material.roughness,
+          0,
+          delta * 10
+        )),
+        (this.material.metalness = lerp(
+          this.material.metalness,
+          1,
+          delta * 10
+        )))
       : (this.material.color.lerp(this.defaultColor, delta),
         (this.material.roughness = lerp(this.material.roughness, 1, delta)),
-        (this.material.metalness = lerp(this.material.metalness, 0, delta)))
+        (this.material.metalness = lerp(this.material.metalness, 0, delta)));
 
-// --------------tres maneras distintas para cambiar la escala----------------------------
+    // --------------tres maneras distintas para cambiar la escala----------------------------
 
     // this.clicked
     //   ? this.scale.set(
@@ -105,8 +112,8 @@ class Pickable extends Mesh {
     //       lerp(this.scale.z, 1.0, delta)
     //     )
 
-    this.clicked ? this.v.set(1.5, 1.5, 1.5) : this.v.set(1.0, 1.0, 1.0)
-    this.scale.lerp(this.v, delta * 5)
+    this.clicked ? this.v.set(1.5, 1.5, 1.5) : this.v.set(1.0, 1.0, 1.0);
+    this.scale.lerp(this.v, delta * 5);
   }
 }
 
@@ -179,12 +186,11 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
   //   pickable.clicked = !pickable.clicked
   // }
 
-
   //--------------codigo adicional para redireccion a la otra pagina-----------------------------------
 
   if (intersects.length && intersects[0].object === cylinder) {
     setTimeout(() => {
-      window.location.href = "index.html";
+      window.location.href = "pagina3.html";
     }, 1000); // 1000 ms de retardo, ajusta según tu animación
   }
 
@@ -248,6 +254,12 @@ document.body.appendChild(stats.dom);
 const clock = new Clock();
 let delta = 0;
 
+// Sincronización de labels con objetos 3D agregado para poner titulos
+const labels = document.querySelectorAll<HTMLDivElement>('.label');
+const meshes = [cylinder, cube, pyramid];
+const v = new Vector3();
+let x, y;
+
 function animate() {
   requestAnimationFrame(animate);
 
@@ -258,6 +270,22 @@ function animate() {
   });
 
   controls.update();
+
+    // Sincronizar labels con objetos 3D agregado para poner titulos
+
+    for (let i = 0; i < meshes.length; i++) {
+      v.copy(meshes[i].position);
+      v.project(camera);
+
+      x = ((1 + v.x) / 2) * window.innerWidth - 50;
+      y = ((1 - v.y) / 2) * window.innerHeight;
+
+      labels[i].style.position = 'absolute';
+      labels[i].style.left = x + 'px';
+      labels[i].style.top = y + 'px';
+      labels[i].style.display = 'block';
+      labels[i].style.pointerEvents = 'auto';
+    }
 
   renderer.render(scene, camera);
 

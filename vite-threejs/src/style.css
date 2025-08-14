@@ -2,3 +2,43 @@ body {
   overflow: hidden;
   margin: 0px;
 }
+
+
+.label {
+  position: absolute;
+  color: #fffb00;
+  font-family: monospace;
+  pointer-events: none;
+  text-align: center;
+  width: 75px;
+  height: 25px;
+  font-size: 1.5rem;
+  filter: drop-shadow(2px 2px 1px #ff0000);
+  display: none;
+}
+
+.fondo {
+  background: url('/fondo/2151792461.jpg') no-repeat center center fixed;
+  background-size: cover;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
+  border-radius: 10px;
+  color: azure;
+  border: 2px solid rgba(255, 255, 255, 0.521);
+}
