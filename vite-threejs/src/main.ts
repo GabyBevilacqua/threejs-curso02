@@ -1,120 +1,37 @@
 import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import Stats from 'three/addons/libs/stats.module.js'
+import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
+import RAPIER from '@dimforge/rapier3d-compat'
 
-class CharacterController {
-  keyMap: { [key: string]: boolean } = {}
-  wait = false
-  animationActions: { [key: string]: THREE.AnimationAction }
-  activeAction = ''
-  speed = 0
-
-  constructor(animationActions: { [key: string]: THREE.AnimationAction }) {
-    this.animationActions = animationActions
-    document.addEventListener('keydown', this.onDocumentKey)
-    document.addEventListener('keyup', this.onDocumentKey)
-  }
-
-  onDocumentKey = (e: KeyboardEvent) => {
-    this.keyMap[e.code] = e.type === 'keydown'
-  }
-
-  dispose() {
-    document.removeEventListener('keydown', this.onDocumentKey)
-    document.removeEventListener('keyup', this.onDocumentKey)
-  }
-
-  setAction(action: string) {
-    if (this.activeAction != action) {
-      this.animationActions[this.activeAction].fadeOut(0.25)
-      this.animationActions[action].reset().fadeIn(0.25).play()
-      this.activeAction = action
-
-      switch (action) {
-        case 'walk':
-          this.speed = 1
-          break
-        case 'run':
-        case 'jump':
-          this.speed = 4
-          break
-        case 'pose':
-        case 'idle':
-          this.speed = 0
-          break
-      }
-    }
-  }
-
-  update() {
-    if (!this.wait) {
-      let actionAssigned = false
-
-      if (this.keyMap['Space']) {
-        this.setAction('jump')
-        actionAssigned = true
-        this.wait = true // blocks further actions until jump is finished
-        setTimeout(() => (this.wait = false), 1000)
-      }
-
-      if (!actionAssigned && this.keyMap['KeyW'] && this.keyMap['ShiftLeft']) {
-        this.setAction('run')
-        actionAssigned = true
-      }
-
-      if (!actionAssigned && this.keyMap['KeyW']) {
-        this.setAction('walk')
-        actionAssigned = true
-      }
-
-      if (!actionAssigned && this.keyMap['KeyQ']) {
-        this.setAction('pose')
-        actionAssigned = true
-      }
-
-      !actionAssigned && this.setAction('idle')
-    }
-  }
-}
-
-class Grid {
-  gridHelper = new THREE.GridHelper(100, 100)
-  speed = 0
-
-  constructor(scene: THREE.Scene) {
-    scene.add(this.gridHelper)
-  }
-
-  lerp(from: number, to: number, speed: number) {
-    const amount = (1 - speed) * from + speed * to
-    return Math.abs(from - to) < 0.001 ? to : amount
-  }
-
-  update(delta: number, toSpeed: number) {
-    this.speed = this.lerp(this.speed, toSpeed, delta * 10)
-    this.gridHelper.position.z -= this.speed * delta
-    this.gridHelper.position.z = this.gridHelper.position.z % 10
-  }
-}
+await RAPIER.init() // This line is only needed if using the compat version
+const gravity = new RAPIER.Vector3(0.0, -9.81, 0.0)
+const world = new RAPIER.World(gravity)
+const dynamicBodies: [THREE.Object3D, RAPIER.RigidBody][] = []
 
 const scene = new THREE.Scene()
 
-new RGBELoader().load('img/venice_sunset_1k.hdr', (texture) => {
-  texture.mapping = THREE.EquirectangularReflectionMapping
-  scene.environment = texture
-  scene.background = texture
-  scene.backgroundBlurriness = 1
-})
+const light1 = new THREE.SpotLight(undefined, Math.PI * 10)
+light1.position.set(2.5, 5, 5)
+light1.angle = Math.PI / 3
+light1.penumbra = 0.5
+light1.castShadow = true
+light1.shadow.blurSamples = 10
+light1.shadow.radius = 5
+scene.add(light1)
+
+const light2 = light1.clone()
+light2.position.set(-2.5, 5, 5)
+scene.add(light2)
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100)
-camera.position.set(0.1, 1.2, 1.8)
+camera.position.set(0, 2, 5)
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
+renderer.shadowMap.enabled = true
+renderer.shadowMap.type = THREE.VSMShadowMap
 document.body.appendChild(renderer.domElement)
 
 window.addEventListener('resize', () => {
@@ -125,71 +42,115 @@ window.addEventListener('resize', () => {
 
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = true
-controls.target.set(0, 0.75, 0)
+controls.target.y = 1
+
+// Cuboid Collider
+const cubeMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshNormalMaterial())
+cubeMesh.castShadow = true
+scene.add(cubeMesh)
+const cubeBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(-4, 5, 0).setCanSleep(false))
+const cubeShape = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5).setMass(1).setRestitution(1.1)
+world.createCollider(cubeShape, cubeBody)
+dynamicBodies.push([cubeMesh, cubeBody])
+
+// Ball Collider
+const sphereMesh = new THREE.Mesh(new THREE.SphereGeometry(), new THREE.MeshNormalMaterial())
+sphereMesh.castShadow = true
+scene.add(sphereMesh)
+const sphereBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(-2, 5, 0).setCanSleep(false))
+const sphereShape = RAPIER.ColliderDesc.ball(1).setMass(1).setRestitution(1.1)
+world.createCollider(sphereShape, sphereBody)
+dynamicBodies.push([sphereMesh, sphereBody])
+
+// Cylinder Collider
+const cylinderMesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 16), new THREE.MeshNormalMaterial())
+cylinderMesh.castShadow = true
+scene.add(cylinderMesh)
+const cylinderBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 5, 0).setCanSleep(false))
+const cylinderShape = RAPIER.ColliderDesc.cylinder(1, 1).setMass(1).setRestitution(1.1)
+world.createCollider(cylinderShape, cylinderBody)
+dynamicBodies.push([cylinderMesh, cylinderBody])
+
+// ConvexHull Collider
+const icosahedronMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshNormalMaterial())
+icosahedronMesh.castShadow = true
+scene.add(icosahedronMesh)
+const icosahedronBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(2, 5, 0).setCanSleep(false))
+const points = new Float32Array(icosahedronMesh.geometry.attributes.position.array)
+const icosahedronShape = (RAPIER.ColliderDesc.convexHull(points) as RAPIER.ColliderDesc).setMass(1).setRestitution(1.1)
+world.createCollider(icosahedronShape, icosahedronBody)
+dynamicBodies.push([icosahedronMesh, icosahedronBody])
+
+// Trimesh Collider
+const torusKnotMesh = new THREE.Mesh(new THREE.TorusKnotGeometry(), new THREE.MeshNormalMaterial())
+torusKnotMesh.castShadow = true
+scene.add(torusKnotMesh)
+const torusKnotBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(4, 5, 0))
+const vertices = new Float32Array(torusKnotMesh.geometry.attributes.position.array)
+let indices = new Uint32Array((torusKnotMesh.geometry.index as THREE.BufferAttribute).array)
+const torusKnotShape = (RAPIER.ColliderDesc.trimesh(vertices, indices) as RAPIER.ColliderDesc)
+  .setMass(1)
+  .setRestitution(1.1)
+world.createCollider(torusKnotShape, torusKnotBody)
+dynamicBodies.push([torusKnotMesh, torusKnotBody])
+
+const floorMesh = new THREE.Mesh(new THREE.BoxGeometry(100, 1, 100), new THREE.MeshPhongMaterial())
+floorMesh.receiveShadow = true
+floorMesh.position.y = -1
+scene.add(floorMesh)
+const floorBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0))
+const floorShape = RAPIER.ColliderDesc.cuboid(50, 0.5, 50)
+world.createCollider(floorShape, floorBody)
+
+const raycaster = new THREE.Raycaster()
+const mouse = new THREE.Vector2()
+
+renderer.domElement.addEventListener('click', (e) => {
+  mouse.set(
+    (e.clientX / renderer.domElement.clientWidth) * 2 - 1,
+    -(e.clientY / renderer.domElement.clientHeight) * 2 + 1
+  )
+
+  raycaster.setFromCamera(mouse, camera)
+
+  const intersects = raycaster.intersectObjects(
+    [cubeMesh, sphereMesh, cylinderMesh, icosahedronMesh, torusKnotMesh],
+    false
+  )
+
+  if (intersects.length) {
+    dynamicBodies.forEach((b) => {
+      b[0] === intersects[0].object && b[1].applyImpulse(new RAPIER.Vector3(0, 10, 0), true)
+    })
+  }
+})
 
 const stats = new Stats()
 document.body.appendChild(stats.dom)
 
-let mixer: THREE.AnimationMixer
-let animationActions: { [key: string]: THREE.AnimationAction } = {}
+const gui = new GUI()
 
-const characterController = new CharacterController(animationActions)
-const grid = new Grid(scene)
-
-const dracoLoader = new DRACOLoader()
-// dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/') // loading from a CDN
-dracoLoader.setDecoderPath('jsm/libs/draco/') // loading from own webserver
-
-const glTFLoader = new GLTFLoader()
-glTFLoader.setDRACOLoader(dracoLoader)
-
-// glTFLoader.load('models/crypto$@walk_compressed.glb', (gltf) => {
-//   mixer = new THREE.AnimationMixer(gltf.scene)
-
-//   mixer.clipAction(gltf.animations[0]).play()
-
-//   scene.add(gltf.scene)
-// })
-
-async function loadCrypto() {
-  const [crypto, idle, run, jump, pose] = await Promise.all([
-    glTFLoader.loadAsync('models/crypto$@walk_compressed.glb'),
-    glTFLoader.loadAsync('models/crypto@idle.glb'),
-    glTFLoader.loadAsync('models/crypto@run.glb'),
-    glTFLoader.loadAsync('models/crypto@jump2.glb'),
-    glTFLoader.loadAsync('models/crypto@pose.glb')
-  ])
-
-  mixer = new THREE.AnimationMixer(crypto.scene)
-
-  animationActions['idle'] = mixer.clipAction(idle.animations[0])
-  animationActions['walk'] = mixer.clipAction(crypto.animations[0])
-  animationActions['run'] = mixer.clipAction(run.animations[0])
-  animationActions['jump'] = mixer.clipAction(jump.animations[0])
-  animationActions['pose'] = mixer.clipAction(pose.animations[0])
-
-  animationActions['idle'].play()
-  characterController.activeAction = 'idle'
-
-  scene.add(crypto.scene)
-}
-await loadCrypto()
+const physicsFolder = gui.addFolder('Physics')
+physicsFolder.add(world.gravity, 'x', -10.0, 10.0, 0.1)
+physicsFolder.add(world.gravity, 'y', -10.0, 10.0, 0.1)
+physicsFolder.add(world.gravity, 'z', -10.0, 10.0, 0.1)
 
 const clock = new THREE.Clock()
-let delta = 0
+let delta
 
 function animate() {
   requestAnimationFrame(animate)
 
   delta = clock.getDelta()
+  world.timestep = Math.min(delta, 0.1)
+  world.step()
+
+  for (let i = 0, n = dynamicBodies.length; i < n; i++) {
+    dynamicBodies[i][0].position.copy(dynamicBodies[i][1].translation())
+    dynamicBodies[i][0].quaternion.copy(dynamicBodies[i][1].rotation())
+  }
 
   controls.update()
-
-  characterController.update()
-
-  mixer && mixer.update(delta)
-
-  grid.update(delta, characterController.speed)
 
   renderer.render(scene, camera)
 
