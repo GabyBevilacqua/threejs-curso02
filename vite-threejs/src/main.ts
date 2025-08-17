@@ -1,324 +1,141 @@
 import './style.css'
 import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
+import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js'
 import Stats from 'three/addons/libs/stats.module.js'
 import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
-import RAPIER from '@dimforge/rapier3d-compat'
-
-class RapierDebugRenderer {
-  mesh
-  world
-  enabled = true
-
-  constructor(scene: THREE.Scene, world: RAPIER.World) {
-    this.world = world
-    this.mesh = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true }))
-    this.mesh.frustumCulled = false
-    scene.add(this.mesh)
-  }
-
-  update() {
-    if (this.enabled) {
-      const { vertices, colors } = this.world.debugRender()
-      this.mesh.geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3))
-      this.mesh.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4))
-      this.mesh.visible = true
-    } else {
-      this.mesh.visible = false
-    }
-  }
-}
-
-class Car {
-  dynamicBodies: [THREE.Object3D, RAPIER.RigidBody][] = []
-
-  constructor() {
-    // now calling `loadCar` outside of constructor, since async await won't wait if called in a constructor.
-  }
-
-  async loadCar(scene: THREE.Scene, position: [number, number, number]) {
-    await new GLTFLoader().loadAsync('models/sedanSports.glb').then((gltf) => {
-      const carMesh = gltf.scene.getObjectByName('body') as THREE.Group
-      carMesh.position.set(0, 0, 0)
-      carMesh.traverse((o) => {
-        o.castShadow = true
-      })
-
-      // carMesh.rotation.set(Math.PI, 0, 0) // Rota 180° en el eje X para que el carrito no caiga bocaabajo
-
-      const wheelBLMesh = gltf.scene.getObjectByName('wheel_backLeft') as THREE.Group
-      const wheelBRMesh = gltf.scene.getObjectByName('wheel_backRight') as THREE.Group
-      const wheelFLMesh = gltf.scene.getObjectByName('wheel_frontLeft') as THREE.Group
-      const wheelFRMesh = gltf.scene.getObjectByName('wheel_frontRight') as THREE.Group
-      wheelBLMesh.position.set(0, 0, 0)
-      wheelBRMesh.position.set(0, 0, 0)
-      wheelFLMesh.position.set(0, 0, 0)
-      wheelFRMesh.position.set(0, 0, 0)
-
-      //scene.add(gltf.scene)
-      scene.add(carMesh, wheelBLMesh, wheelBRMesh, wheelFLMesh, wheelFRMesh)
-
-      const carBody = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(...position)
-          .setCanSleep(false)
-      )
-      const wheelBLBody = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(-1 + position[0], 1 + position[1], 1 + position[2])
-          .setCanSleep(false)
-      )
-      const wheelBRBody = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(1 + position[0], 1 + position[1], 1 + position[2])
-          .setCanSleep(false)
-      )
-      const wheelFLBody = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(-1 + position[0], 1 + position[1], -1 + position[2])
-          .setCanSleep(false)
-      )
-      const wheelFRBody = world.createRigidBody(
-        RAPIER.RigidBodyDesc.dynamic()
-          .setTranslation(1 + position[0], 1 + position[1], -1 + position[2])
-          .setCanSleep(false)
-      )
-
-      // create a convexhull from all meshes in the carMesh group
-      const v = new THREE.Vector3()
-      let positions: number[] = []
-      carMesh.updateMatrixWorld(true) // ensure world matrix is up to date
-      carMesh.traverse((o) => {
-        if (o.type === 'Mesh') {
-          const positionAttribute = (o as THREE.Mesh).geometry.getAttribute('position')
-          for (let i = 0, l = positionAttribute.count; i < l; i++) {
-            v.fromBufferAttribute(positionAttribute, i)
-            v.applyMatrix4((o.parent as THREE.Object3D).matrixWorld)
-            positions.push(...v)
-          }
-        }
-      })
-
-      // create shapes for carBody and wheelBodies
-      const carShape = (RAPIER.ColliderDesc.convexHull(new Float32Array(positions)) as RAPIER.ColliderDesc).setMass(1).setRestitution(0.5)
-      const wheelBLShape = RAPIER.ColliderDesc.cylinder(0.1, 0.3)
-        .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2))
-        .setTranslation(-0.2, 0, 0)
-        .setRestitution(0.5)
-      const wheelBRShape = RAPIER.ColliderDesc.cylinder(0.1, 0.3)
-        .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))
-        .setTranslation(0.2, 0, 0)
-        .setRestitution(0.5)
-      const wheelFLShape = RAPIER.ColliderDesc.cylinder(0.1, 0.3)
-        .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))
-        .setTranslation(-0.2, 0, 0)
-        .setRestitution(0.5)
-      const wheelFRShape = RAPIER.ColliderDesc.cylinder(0.1, 0.3)
-        .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2))
-        .setTranslation(0.2, 0, 0)
-        .setRestitution(0.5)
-
-      // create world collider
-      world.createCollider(carShape, carBody)
-      world.createCollider(wheelBLShape, wheelBLBody)
-      world.createCollider(wheelBRShape, wheelBRBody)
-      world.createCollider(wheelFLShape, wheelFLBody)
-      world.createCollider(wheelFRShape, wheelFRBody)
-
-      // attach wheels to car using Rapier revolute joints
-      world.createImpulseJoint(
-        RAPIER.JointData.revolute(new RAPIER.Vector3(-0.55, 0, 0.63), new RAPIER.Vector3(0, 0, 0), new RAPIER.Vector3(-1, 0, 0)),
-        carBody,
-        wheelBLBody,
-        true
-      )
-      world.createImpulseJoint(
-        RAPIER.JointData.revolute(new RAPIER.Vector3(0.55, 0, 0.63), new RAPIER.Vector3(0, 0, 0), new RAPIER.Vector3(1, 0, 0)),
-        carBody,
-        wheelBRBody,
-        true
-      )
-      world.createImpulseJoint(
-        RAPIER.JointData.revolute(new RAPIER.Vector3(-0.55, 0, -0.63), new RAPIER.Vector3(0, 0, 0), new RAPIER.Vector3(-1, 0, 0)),
-        carBody,
-        wheelFLBody,
-        true
-      )
-      world.createImpulseJoint(
-        RAPIER.JointData.revolute(new RAPIER.Vector3(0.55, 0, -0.63), new RAPIER.Vector3(0, 0, 0), new RAPIER.Vector3(1, 0, 0)),
-        carBody,
-        wheelFRBody,
-        true
-      )
-
-      // update local dynamicBodies so mesh positions and quaternions are updated with the physics world info
-      this.dynamicBodies.push([carMesh, carBody])
-      this.dynamicBodies.push([wheelBLMesh, wheelBLBody])
-      this.dynamicBodies.push([wheelBRMesh, wheelBRBody])
-      this.dynamicBodies.push([wheelFLMesh, wheelFLBody])
-      this.dynamicBodies.push([wheelFRMesh, wheelFRBody])
-    })
-  }
-
-  update() {
-    for (let i = 0, n = this.dynamicBodies.length; i < n; i++) {
-      this.dynamicBodies[i][0].position.copy(this.dynamicBodies[i][1].translation())
-      this.dynamicBodies[i][0].quaternion.copy(this.dynamicBodies[i][1].rotation())
-    }
-  }
-}
-
-await RAPIER.init() // This line is only needed if using the compat version
-const gravity = new RAPIER.Vector3(0.0, -9.81, 0.0)
-const world = new RAPIER.World(gravity)
-const dynamicBodies: [THREE.Object3D, RAPIER.RigidBody][] = []
 
 const scene = new THREE.Scene()
 
-const rapierDebugRenderer = new RapierDebugRenderer(scene, world)
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+camera.position.set(0, 5, 2) // x, y, z
 
-const light1 = new THREE.SpotLight(undefined, Math.PI * 10)
-light1.position.set(2.5, 5, 5)
-light1.angle = Math.PI / 1.8
-light1.penumbra = 0.5
-light1.castShadow = true
-light1.shadow.blurSamples = 10
-light1.shadow.radius = 5
-scene.add(light1)
+const light = new THREE.DirectionalLight(0xebfeff, Math.PI)
+light.castShadow = true
+light.shadow.camera.far = 250
+light.shadow.camera.left = -50
+light.shadow.camera.right = 50
+light.shadow.camera.top = 50
+light.shadow.camera.bottom = -50
+light.shadow.blurSamples = 10
+light.shadow.radius = 5
+light.target = camera
+scene.add(light)
 
-const light2 = light1.clone()
-light2.position.set(-2.5, 5, 5)
-scene.add(light2)
+const lightOffset = new THREE.Vector3(100, 30, 70)
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100)
-camera.position.set(0, 2, 5)
+const lightHelper = new THREE.CameraHelper(light.shadow.camera)
+lightHelper.visible = false
+scene.add(lightHelper)
+
+const textureLoader = new THREE.TextureLoader()
+const textureFlare0 = textureLoader.load('img/lensflare0.png')
+const textureFlare3 = textureLoader.load('img/lensflare3.png')
+
+const lensflare = new Lensflare()
+lensflare.addElement(new LensflareElement(textureFlare0, 1000, 0))
+lensflare.addElement(new LensflareElement(textureFlare3, 500, 0.2))
+lensflare.addElement(new LensflareElement(textureFlare3, 250, 0.8))
+lensflare.addElement(new LensflareElement(textureFlare3, 125, 0.6))
+lensflare.addElement(new LensflareElement(textureFlare3, 62.5, 0.4))
+light.add(lensflare)
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
+renderer.toneMapping = THREE.ACESFilmicToneMapping
+renderer.toneMappingExposure = 0.7
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.VSMShadowMap
 document.body.appendChild(renderer.domElement)
+
+await new RGBELoader().loadAsync('img/venice_sunset_1k.hdr').then((texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping
+  scene.environment = texture
+  scene.environmentIntensity = 0.1
+  scene.background = scene.environment
+  scene.backgroundIntensity = 0.25
+  scene.backgroundBlurriness = 0.1
+})
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
+  render()
 })
 
-const controls = new OrbitControls(camera, renderer.domElement)
-controls.enableDamping = true
-controls.target.y = 1
+const menuPanel = document.getElementById('menuPanel') as HTMLDivElement
 
-// Cuboid Collider
-const cubeMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshNormalMaterial())
-cubeMesh.castShadow = true
-scene.add(cubeMesh)
-const cubeBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(-5, 5, 0).setCanSleep(false))
-const cubeShape = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5).setMass(1).setRestitution(0.5)
-world.createCollider(cubeShape, cubeBody)
-dynamicBodies.push([cubeMesh, cubeBody])
+const startButton = document.getElementById('startButton') as HTMLButtonElement
+startButton.addEventListener(
+  'click',
+  () => {
+    controls.lock()
+  },
+  false
+)
 
-// Ball Collider
-const sphereMesh = new THREE.Mesh(new THREE.SphereGeometry(), new THREE.MeshNormalMaterial())
-sphereMesh.castShadow = true
-scene.add(sphereMesh)
-const sphereBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(-2.5, 5, 0).setCanSleep(false))
-const sphereShape = RAPIER.ColliderDesc.ball(1).setMass(1).setRestitution(0.5)
-world.createCollider(sphereShape, sphereBody)
-dynamicBodies.push([sphereMesh, sphereBody])
-
-// Cylinder Collider
-const cylinderMesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 2, 16), new THREE.MeshNormalMaterial())
-cylinderMesh.castShadow = true
-scene.add(cylinderMesh)
-const cylinderBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 5, -2).setCanSleep(false))
-const cylinderShape = RAPIER.ColliderDesc.cylinder(1, 1).setMass(1).setRestitution(0.5)
-world.createCollider(cylinderShape, cylinderBody)
-dynamicBodies.push([cylinderMesh, cylinderBody])
-
-// ConvexHull Collider
-const icosahedronMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshNormalMaterial())
-icosahedronMesh.castShadow = true
-scene.add(icosahedronMesh)
-const icosahedronBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(2.5, 5, 0).setCanSleep(false))
-const points = new Float32Array(icosahedronMesh.geometry.attributes.position.array)
-const icosahedronShape = (RAPIER.ColliderDesc.convexHull(points) as RAPIER.ColliderDesc).setMass(1).setRestitution(0.5)
-world.createCollider(icosahedronShape, icosahedronBody)
-dynamicBodies.push([icosahedronMesh, icosahedronBody])
-
-// Trimesh Collider
-const torusKnotMesh = new THREE.Mesh(new THREE.TorusKnotGeometry(), new THREE.MeshNormalMaterial())
-torusKnotMesh.castShadow = true
-scene.add(torusKnotMesh)
-const torusKnotBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(5, 5, 0))
-const vertices = new Float32Array(torusKnotMesh.geometry.attributes.position.array)
-let indices = new Uint32Array((torusKnotMesh.geometry.index as THREE.BufferAttribute).array)
-const torusKnotShape = (RAPIER.ColliderDesc.trimesh(vertices, indices) as RAPIER.ColliderDesc).setMass(1).setRestitution(0.5)
-world.createCollider(torusKnotShape, torusKnotBody)
-dynamicBodies.push([torusKnotMesh, torusKnotBody])
-
-// the floor (using a cuboid)
-const floorMesh = new THREE.Mesh(new THREE.BoxGeometry(50, 1, 50), new THREE.MeshPhongMaterial())
-floorMesh.receiveShadow = true
-floorMesh.position.y = -1
-scene.add(floorMesh)
-const floorBody = world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(0, -1, 0))
-const floorShape = RAPIER.ColliderDesc.cuboid(25, 0.5, 25)
-world.createCollider(floorShape, floorBody)
-
-// creating a shape from a loaded geometry. (Using OBJLoader)
-new OBJLoader().loadAsync('models/suzanne.obj').then((object) => {
-  //console.log(object)
-  scene.add(object)
-  const suzanneMesh = object.getObjectByName('Suzanne') as THREE.Mesh
-  suzanneMesh.material = new THREE.MeshNormalMaterial()
-  suzanneMesh.castShadow = true
-
-  const suzanneBody = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(-3, 10, -2).setCanSleep(false))
-  const points = new Float32Array(suzanneMesh.geometry.attributes.position.array)
-  const suzanneShape = (RAPIER.ColliderDesc.convexHull(points) as RAPIER.ColliderDesc).setMass(1).setRestitution(0.5)
-  world.createCollider(suzanneShape, suzanneBody)
-  dynamicBodies.push([suzanneMesh, suzanneBody])
+const controls = new PointerLockControls(camera, renderer.domElement)
+controls.addEventListener('change', () => {
+  console.log('pointerlock change')
 })
+controls.addEventListener('lock', () => (menuPanel.style.display = 'none'))
+controls.addEventListener('unlock', () => (menuPanel.style.display = 'block'))
 
-const car = new Car()
-await car.loadCar(scene, [0, 2, 0]) // now calling `loadCar` outside of constructor, since async await won't wait if called in a constructor
+const planeGeometry = new THREE.PlaneGeometry(1000, 1000, 1, 1)
+const material = new THREE.MeshStandardMaterial()
+const plane = new THREE.Mesh(planeGeometry, material)
+plane.rotateX(-Math.PI / 2)
+plane.receiveShadow = true
+scene.add(plane)
 
- const car2 = new Car()
- await car2.loadCar(scene, [-3, 2, 0])
+let geometries: THREE.BufferGeometry[] = []
+for (let i = 0; i < 1000; i++) {
+  const g = new THREE.BoxGeometry(Math.random() * 4 + 1, Math.random() * 29 + 1, Math.random() * 4 + 1)
+  g.computeBoundingBox()
+  g.translate(Math.random() * 500 - 250, ((g as any).boundingBox.max.y - (g as any).boundingBox.min.y) / 2, Math.random() * 500 - 250)
+  geometries.push(g)
+}
 
-const raycaster = new THREE.Raycaster()
-const mouse = new THREE.Vector2()
+// merge geometries
+const mergedGeometries = BufferGeometryUtils.mergeGeometries(geometries)
 
-renderer.domElement.addEventListener('click', (e) => {
-  mouse.set((e.clientX / renderer.domElement.clientWidth) * 2 - 1, -(e.clientY / renderer.domElement.clientHeight) * 2 + 1)
+const cubeMaterial = new THREE.MeshStandardMaterial({ roughness: 0.12, metalness: 0.9 })
+const buildings = new THREE.Mesh(mergedGeometries, cubeMaterial)
+buildings.castShadow = true
+buildings.receiveShadow = true
+scene.add(buildings)
 
-  raycaster.setFromCamera(mouse, camera)
-
-  const intersects = raycaster.intersectObjects(
-    dynamicBodies.flatMap((a) => a[0]),
-    false
-  )
-
-  if (intersects.length) {
-    dynamicBodies.forEach((b) => {
-      b[0] === intersects[0].object && b[1].applyImpulse(new RAPIER.Vector3(0, 10, 0), true)
-    })
-  }
-})
+const keyMap: { [key: string]: boolean } = {}
+const onDocumentKey = (e: KeyboardEvent) => {
+  keyMap[e.code] = e.type === 'keydown'
+}
+document.addEventListener('keydown', onDocumentKey, false)
+document.addEventListener('keyup', onDocumentKey, false)
 
 const stats = new Stats()
 document.body.appendChild(stats.dom)
 
-const gui = new GUI()
-gui.add(rapierDebugRenderer, 'enabled').name('Rapier Degug Renderer')
+const gui = new GUI({ width: 400 }).close()
 
-const physicsFolder = gui.addFolder('Physics')
-physicsFolder.add(world.gravity, 'x', -10.0, 10.0, 0.1)
-physicsFolder.add(world.gravity, 'y', -10.0, 10.0, 0.1)
-physicsFolder.add(world.gravity, 'z', -10.0, 10.0, 0.1)
+const rendererFolder = gui.addFolder('Renderer')
+rendererFolder.add(renderer, 'toneMappingExposure', 0, 2, 0.01)
+
+const backgroundFolder = gui.addFolder('Background')
+backgroundFolder.add(scene, 'backgroundIntensity', 0, 2, 0.01)
+backgroundFolder.add(scene, 'backgroundBlurriness', 0, 2, 0.01)
+
+const environmentFolder = gui.addFolder('Environnment')
+environmentFolder.add(scene, 'environmentIntensity', 0, 2, 0.01)
+
+const materialFolder = gui.addFolder('cubeMaterial')
+materialFolder.add(cubeMaterial, 'roughness', 0, 1.0, 0.01)
+materialFolder.add(cubeMaterial, 'metalness', 0, 1.0, 0.01)
+
+const lightFolder = gui.addFolder('Light Helper')
+lightFolder.add(lightHelper, 'visible')
 
 const clock = new THREE.Clock()
 let delta
@@ -327,24 +144,32 @@ function animate() {
   requestAnimationFrame(animate)
 
   delta = clock.getDelta()
-  world.timestep = Math.min(delta, 0.1)
-  world.step()
 
-  for (let i = 0, n = dynamicBodies.length; i < n; i++) {
-    dynamicBodies[i][0].position.copy(dynamicBodies[i][1].translation())
-    dynamicBodies[i][0].quaternion.copy(dynamicBodies[i][1].rotation())
+  //controls.update() // PointerLockControls doesn't have an update method, unlike OrbitControls.
+
+  if (keyMap['KeyW'] || keyMap['ArrowUp']) {
+    controls.moveForward(delta * 25)
+  }
+  if (keyMap['KeyS'] || keyMap['ArrowDown']) {
+    controls.moveForward(-delta * 25)
+  }
+  if (keyMap['KeyA'] || keyMap['ArrowLeft']) {
+    controls.moveRight(-delta * 25)
+  }
+  if (keyMap['KeyD'] || keyMap['ArrowRight']) {
+    controls.moveRight(delta * 25)
   }
 
-  car.update()
-  car2.update()
+  light.position.copy(camera.position).add(lightOffset)
 
-  rapierDebugRenderer.update()
-
-  controls.update()
-
-  renderer.render(scene, camera)
+  render()
+  //console.log( renderer.info.render.calls );
 
   stats.update()
+}
+
+function render() {
+  renderer.render(scene, camera)
 }
 
 animate()
