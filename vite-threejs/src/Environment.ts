@@ -37,7 +37,7 @@ export default class Environment {
       texture.mapping = EquirectangularReflectionMapping
       this.scene.environment = texture
       this.scene.background = texture
-      this.scene.backgroundBlurriness = 0.4
+      this.scene.backgroundBlurriness = 0.2
     })
   }
 }

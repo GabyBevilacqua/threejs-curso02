@@ -47,6 +47,7 @@ export default class Crypto extends Group {
     animationActions['idle'].play()
 
     this.add(crypto.scene)
+    crypto.scene.scale.set(0.75, 0.75, 0.75) // Cambiar 0.5 por el factor necesario para adaptar el tamano
   }
 
   update(delta: number) {

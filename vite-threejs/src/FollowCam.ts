@@ -9,7 +9,7 @@ export default class FollowCam {
   constructor(scene: Scene, camera: PerspectiveCamera, renderer: WebGLRenderer) {
     this.camera = camera
 
-    this.yaw.position.y = 0.75
+    this.yaw.position.y = 0.95
 
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement === renderer.domElement) {
