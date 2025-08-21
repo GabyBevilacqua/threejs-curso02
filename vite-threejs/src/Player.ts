@@ -3,10 +3,12 @@ import { Euler, Matrix4, Object3D, PerspectiveCamera, Quaternion, Scene, Vector3
 import AnimationController from './AnimationController'
 import FollowCam from './FollowCam'
 import Keyboard from './Keyboard'
+import UI from './UI'
 
 export default class Player {
   scene: Scene
   world: World
+  ui: UI
   body: RigidBody
   animationController?: AnimationController
   vector = new Vector3()
@@ -20,16 +22,19 @@ export default class Player {
   followCam: FollowCam
   keyboard: Keyboard
   wait = false
+  handle = -1
 
   constructor(
     scene: Scene,
     camera: PerspectiveCamera,
     renderer: WebGLRenderer,
     world: World,
-    position: [number, number, number] = [0, 0, 0]
+    position: [number, number, number] = [0, 0, 0],
+    ui: UI
   ) {
     this.scene = scene
     this.world = world
+    this.ui = ui
     this.keyboard = new Keyboard(renderer)
     this.followCam = new FollowCam(this.scene, camera, renderer)
 
@@ -39,9 +44,10 @@ export default class Player {
       RigidBodyDesc.dynamic()
         .setTranslation(...position)
         .enabledRotations(false, false, false)
-        .setLinearDamping(4)
+        //.setLinearDamping(4)
         .setCanSleep(false)
     )
+    this.handle = this.body.handle
 
     const shape = ColliderDesc.capsule(0.5, 0.15)
       .setTranslation(0, 0.645, 0)
@@ -57,42 +63,55 @@ export default class Player {
     await this.animationController.init()
   }
 
-  setGrounded() {
-    this.body.setLinearDamping(4)
-    this.grounded = true
-    setTimeout(() => (this.wait = false), 250)
+setGrounded(grounded: boolean) {
+    if (grounded != this.grounded) {
+      // do this only if it was changed
+      this.grounded = grounded
+      if (grounded) {
+        this.body.setLinearDamping(4)
+        setTimeout(() => {
+          this.wait = false
+        }, 250)
+      } else {
+        this.body.setLinearDamping(0)
+      }
+    }
+  }
+
+  reset() {
+    this.body.setLinvel(new Vector3(0, 0, 0), true)
+    this.body.setTranslation(new Vector3(0, 1, 0), true)
+    this.ui.reset()
   }
 
   update(delta: number) {
     this.inputVelocity.set(0, 0, 0)
+    let limit = 1
     if (this.grounded) {
       if (this.keyboard.keyMap['KeyW']) {
         this.inputVelocity.z = -1
+        limit = 9.5
       }
       if (this.keyboard.keyMap['KeyS']) {
         this.inputVelocity.z = 1
+        limit = 9.5
       }
       if (this.keyboard.keyMap['KeyA']) {
         this.inputVelocity.x = -1
+        limit = 9.5
       }
       if (this.keyboard.keyMap['KeyD']) {
         this.inputVelocity.x = 1
+        limit = 9.5
       }
 
-      this.inputVelocity.setLength(delta * (this.animationController?.speed || 1)) // limit horizontal movement based on walking or running speed
+      this.inputVelocity.setLength(delta * limit) // limits horizontal movement
 
       if (!this.wait && this.keyboard.keyMap['Space']) {
         this.wait = true
-        this.body.setLinearDamping(0)
-        if (this.keyboard.keyMap['ShiftLeft']) {
-          this.inputVelocity.multiplyScalar(15) // if running, add more boost
-        } else {
-          this.inputVelocity.multiplyScalar(10)
-        }
-        this.inputVelocity.y = 4 // give jumping some height
-        this.grounded = false
+        this.inputVelocity.y = 5 // give jumping some height
       }
-     }
+    }
 
     // // apply the followCam yaw to inputVelocity so the capsule moves forward based on cameras forward direction
     this.euler.y = this.followCam.yaw.rotation.y
@@ -101,6 +120,11 @@ export default class Player {
 
     // // now move the capsule body based on inputVelocity
      this.body.applyImpulse(this.inputVelocity, true)
+
+         // if out of bounds
+    if (this.body.translation().y < -3) {
+      this.reset()
+    }
 
     // // The followCam will lerp towards the followTarget position.
     this.followTarget.position.copy(this.body.translation()) // Copy the capsules position to followTarget
