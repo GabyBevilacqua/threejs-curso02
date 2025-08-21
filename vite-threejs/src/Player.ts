@@ -57,11 +57,11 @@ export default class Player {
     await this.animationController.init()
   }
 
-  // setGrounded() {
-  //   this.body.setLinearDamping(4)
-  //   this.grounded = true
-  //   setTimeout(() => (this.wait = false), 250)
-  // }
+  setGrounded() {
+    this.body.setLinearDamping(4)
+    this.grounded = true
+    setTimeout(() => (this.wait = false), 250)
+  }
 
   update(delta: number) {
     this.inputVelocity.set(0, 0, 0)
@@ -81,17 +81,17 @@ export default class Player {
 
       this.inputVelocity.setLength(delta * (this.animationController?.speed || 1)) // limit horizontal movement based on walking or running speed
 
-    //   if (!this.wait && this.keyboard.keyMap['Space']) {
-    //     this.wait = true
-    //     this.body.setLinearDamping(0)
-    //     if (this.keyboard.keyMap['ShiftLeft']) {
-    //       this.inputVelocity.multiplyScalar(15) // if running, add more boost
-    //     } else {
-    //       this.inputVelocity.multiplyScalar(10)
-    //     }
-    //     this.inputVelocity.y = 5 // give jumping some height
-    //     this.grounded = false
-    //   }
+      if (!this.wait && this.keyboard.keyMap['Space']) {
+        this.wait = true
+        this.body.setLinearDamping(0)
+        if (this.keyboard.keyMap['ShiftLeft']) {
+          this.inputVelocity.multiplyScalar(15) // if running, add more boost
+        } else {
+          this.inputVelocity.multiplyScalar(10)
+        }
+        this.inputVelocity.y = 4 // give jumping some height
+        this.grounded = false
+      }
      }
 
     // // apply the followCam yaw to inputVelocity so the capsule moves forward based on cameras forward direction

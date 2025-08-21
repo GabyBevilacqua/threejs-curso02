@@ -33,11 +33,11 @@ export default class Environment {
   }
 
   async init() {
-    await new RGBELoader().loadAsync('img/venice_sunset_1k.hdr').then((texture) => {
+    await new RGBELoader().loadAsync('img/reinforced_concrete_02_2k.hdr').then((texture) => {
       texture.mapping = EquirectangularReflectionMapping
       this.scene.environment = texture
       this.scene.background = texture
-      this.scene.backgroundBlurriness = 0.2
+      this.scene.backgroundBlurriness = 0
     })
   }
 }

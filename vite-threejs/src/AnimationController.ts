@@ -53,7 +53,7 @@ export default class AnimationController {
         this.setAction(this.animationActions['jump'])
         actionAssigned = true
         this.wait = true // blocks further actions until jump is finished
-        setTimeout(() => (this.wait = false), 1200)
+        setTimeout(() => (this.wait = false), 850) // ajustar el tiempo para que de un salto completo bien y no haga otro trozo de salto despues
       }
 
       // if (!actionAssigned && this.keyboard.keyMap['KeyW'] && this.keyboard.keyMap['ShiftLeft']) {

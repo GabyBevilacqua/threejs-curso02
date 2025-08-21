@@ -33,15 +33,16 @@ export default class Crypto extends Group {
 
     this.mixer = new AnimationMixer(crypto.scene)
     animationActions['idle'] = this.mixer.clipAction(idle.animations[0])
-    animationActions['walk'] = this.mixer.clipAction(crypto.animations[0])
-    //animationActions['walk'] = this.mixer.clipAction(AnimationUtils.subclip(crypto.animations[0], 'walk', 0, 42))
-    animationActions['run'] = this.mixer.clipAction(run.animations[0])
-    //animationActions['run'] = this.mixer.clipAction(AnimationUtils.subclip(run.animations[0], 'run', 0, 17))
+    //animationActions['walk'] = this.mixer.clipAction(crypto.animations[0])
+    animationActions['walk'] = this.mixer.clipAction(AnimationUtils.subclip(crypto.animations[0], 'walk', 0, 42))
+    //animationActions['run'] = this.mixer.clipAction(run.animations[0])
+    animationActions['run'] = this.mixer.clipAction(AnimationUtils.subclip(run.animations[0], 'run', 0, 22))
     // jump.animations[0].tracks = jump.animations[0].tracks.filter(function (e) {
     //   return !e.name.endsWith('.position')
     // })
     // console.log(jump.animations[0].tracks)
     animationActions['jump'] = this.mixer.clipAction(jump.animations[0])
+    // animationActions['jump'] = this.mixer.clipAction(AnimationUtils.subclip(jump.animations[0], 'jump', 0, 60))
     animationActions['pose'] = this.mixer.clipAction(pose.animations[0])
 
     animationActions['idle'].play()

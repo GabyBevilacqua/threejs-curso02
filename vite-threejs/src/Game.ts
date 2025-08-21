@@ -13,7 +13,7 @@ export default class Game {
   player?: Player
   world?: World
   rapierDebugRenderer?: RapierDebugRenderer
-//  eventQueue?: EventQueue
+ eventQueue?: EventQueue
 
   constructor(scene: Scene, camera: PerspectiveCamera, renderer: WebGLRenderer) {
     this.scene = scene
@@ -26,7 +26,7 @@ export default class Game {
     const gravity = new Vector3(0.0, -9.81, 0.0)
 
     this.world = new World(gravity)
-    // this.eventQueue = new EventQueue(true)
+    this.eventQueue = new EventQueue(true)
 
     this.rapierDebugRenderer = new RapierDebugRenderer(this.scene, this.world)
     const gui = new GUI()
@@ -46,7 +46,7 @@ export default class Game {
 
     const environment = new Environment(this.scene)
     await environment.init()
-    // environment.light.target = this.player.followTarget
+    environment.light.target = this.player.followTarget
 
     const ui = new UI(this.renderer)
     ui.show()
@@ -54,12 +54,12 @@ export default class Game {
 
   update(delta: number) {
     ;(this.world as World).timestep = Math.min(delta, 0.1)
-    this.world?.step() // this.eventQueue)
-    // this.eventQueue?.drainCollisionEvents((_, __, started) => {
-    //   if (started) {
-    //     this.player?.setGrounded()
-    //   }
-    // })
+    this.world?.step(this.eventQueue)
+    this.eventQueue?.drainCollisionEvents((_, __, started) => {
+      if (started) {
+        this.player?.setGrounded()
+      }
+    })
     this.player?.update(delta)
     this.rapierDebugRenderer?.update()
   }
