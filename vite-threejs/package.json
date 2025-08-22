@@ -14,7 +14,8 @@
     "jeasings": "^0.0.16",
     "three": "^0.178.0",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vite-plugin-top-level-await": "^1.6.0"
   },
   "dependencies": {
     "lil-gui": "^0.20.0"
